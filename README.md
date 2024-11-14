@@ -139,6 +139,100 @@ class Student extends Model
 }
 ```
 
+**Course Model**:
+```php
+class Course extends Model
+{
+    public function teacher()
+    {
+        return $this->belongsTo(Teacher::class);
+    }
+
+    public function students()
+    {
+        return $this->belongsToMany(Student::class);
+    }
+
+    public function assignments()
+    {
+        return $this->hasMany(Assignment::class);
+    }
+
+    public function tests()
+    {
+        return $this->hasMany(Test::class);
+    }
+}
+```
+
+**Assignment Model**:
+```php
+class Assignment extends Model
+{
+    public function course()
+    {
+        return $this->belongsTo(Course::class);
+    }
+
+    public function student()
+    {
+        return $this->belongsTo(Student::class);
+    }
+
+    public function grade()
+    {
+        return $this->hasOne(Grade::class);
+    }
+}
+```
+
+**Test Model**:
+```php
+class Test extends Model
+{
+    public function course()
+    {
+        return $this->belongsTo(Course::class);
+    }
+
+    public function student()
+    {
+        return $this->belongsTo(Student::class);
+    }
+
+    public function grade()
+    {
+        return $this->hasOne(Grade::class);
+    }
+}
+```
+
+**Grade Model**:
+```php
+class Grade extends Model
+{
+    public function assignment()
+    {
+        return $this->belongsTo(Assignment::class);
+    }
+
+    public function test()
+    {
+        return $this->belongsTo(Test::class);
+    }
+
+    public function student()
+    {
+        return $this->belongsTo(Student::class);
+    }
+
+    public function teacher()
+    {
+        return $this->belongsTo(Teacher::class);
+    }
+}
+```
+
 ### Step 4: Controllers and Routes
 To handle the application's functionality, we'll create controllers for teachers, students, courses, assignments, and grades.
 
@@ -149,6 +243,12 @@ php artisan make:controller CourseController
 
 Controller snippet for managing courses:
 ```php
+public function index()
+{
+    $courses = Course::all();
+    return view('courses.index', compact('courses'));
+}
+
 public function create(Request $request)
 {
     $course = new Course;
@@ -157,14 +257,25 @@ public function create(Request $request)
     $course->teacher_id = Auth::id();
     $course->save();
 
+    if (Auth::check() && Auth::user()->hasRole('teacher')) {
+        $teacher = Teacher::where('email', Auth::user()->email)->first();
+        if (!$teacher) {
+            $teacher = new Teacher;
+            $teacher->name = Auth::user()->name;
+            $teacher->email = Auth::user()->email;
+            $teacher->password = Auth::user()->password;
+            $teacher->save();
+        }
+    }
+
     return redirect()->route('courses.index');
 }
 ```
 
 Routes in `web.php`:
 ```php
-Route::get('/courses', [CourseController::class, 'index']);
-Route::post('/courses', [CourseController::class, 'create']);
+Route::get('/courses', [CourseController::class, 'index'])->name('courses.index');
+Route::post('/courses', [CourseController::class, 'create'])->name('courses.create');
 ```
 
 #### 2. Grading System
@@ -199,6 +310,93 @@ Route::get('/grade/automatic/{assignment_id}', [GradeController::class, 'automat
 ### Step 5: Views
 We create views using Laravel Blade templates for each entity and action.
 
+#### Layout Template for Views
+Create a new file named `app.blade.php` under `resources/views/layouts/`:
+
+**layouts/app.blade.php**:
+```blade
+<!doctype html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <title>{{ config('app.name', 'Laravel') }}</title>
+
+    <!-- Fonts -->
+    <link rel="dns-prefetch" href="//fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=Nunito" rel="stylesheet">
+
+    <!-- Scripts -->
+    @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+</head>
+<body>
+    <div id="app">
+        <nav class="navbar navbar-expand-md navbar-light bg-white shadow-sm">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url('/') }}">
+                    {{ config('app.name', 'Laravel') }}
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{{ __('Toggle navigation') }}">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <!-- Left Side Of Navbar -->
+                    <ul class="navbar-nav me-auto">
+
+                    </ul>
+
+                    <!-- Right Side Of Navbar -->
+                    <ul class="navbar-nav ms-auto">
+                        <!-- Authentication Links -->
+                        @guest
+                            @if (Route::has('login'))
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ route('login') }}">{{ __('Login') }}</a>
+                                </li>
+                            @endif
+
+                            @if (Route::has('register'))
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ route('register') }}">{{ __('Register') }}</a>
+                                </li>
+                            @endif
+                        @else
+                            <li class="nav-item dropdown">
+                                <a id="navbarDropdown" class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre>
+                                    {{ Auth::user()->name }}
+                                </a>
+
+                                <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                                    <a class="dropdown-item" href="{{ route('logout') }}"
+                                       onclick="event.preventDefault();
+                                                     document.getElementById('logout-form').submit();">
+                                        {{ __('Logout') }}
+                                    </a>
+
+                                    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                                        @csrf
+                                    </form>
+                                </div>
+                            </li>
+                        @endguest
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <main class="py-4">
+            @yield('content')
+        </main>
+    </div>
+</body>
+</html>
+```
+
 #### Example Blade File for Courses
 Create a folder named `courses` under `resources/views` and add `index.blade.php`.
 
@@ -218,6 +416,20 @@ Create a folder named `courses` under `resources/views` and add `index.blade.php
             </div>
         </div>
     @endforeach
+    <hr>
+    <h2>Create a New Course</h2>
+    <form method="POST">
+        @csrf
+        <div class="form-group">
+            <label for="title">Course Title:</label>
+            <input type="text" name="title" id="title" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="description">Description:</label>
+            <textarea name="description" id="description" class="form-control" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Course</button>
+    </form>
 </div>
 @endsection
 ```

@@ -45,4 +45,29 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+	public function isTeacher()
+	{
+		return $this->getTeacher() ? true : false;
+	}
+
+	public function getTeacher()
+	{
+		return Teacher::where('user_id', $this->id)->first();
+	}
+
+	public function isStudent()
+	{
+		return $this->getStudent() ? true : false;
+	}
+
+	public function getStudent()
+	{
+		return Student::where('user_id', $this->id)->first();
+	}
+
+	public function courses()
+	{
+		$this->belongsTo(Student::class);
+	}
 }
